@@ -894,13 +894,13 @@
             // Format date for display
             formatDate(dateStr) {
                 const date = new Date(dateStr + 'T00:00:00');
-                return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
             },
        
             // Get month name
             getMonthName(dateStr) {
                 const date = new Date(dateStr + 'T00:00:00');
-                return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             }
         };
 
@@ -1109,7 +1109,7 @@
 
             updateWeekInfo() {
                 const weekInfo = Utils.getWeekInfo();
-                const monthName = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                 
                 document.getElementById('weekInfo').textContent = `Week ${weekInfo.weekNumber}`;
                 document.getElementById('weekDayInfo').textContent = `Day ${weekInfo.dayInWeek} of 7`;
@@ -1310,7 +1310,7 @@
                     }
                     
                     const total = Calculations.calculateTotal(monthDates);
-                    labels.push(monthDate.toLocaleDateString('en-IN', { month: 'short' }));
+                    labels.push(monthDate.toLocaleDateString('en-US', { month: 'short' }));
                     values.push(total / 60); // Convert to hours
                 }
 
