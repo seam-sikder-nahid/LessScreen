@@ -89,6 +89,21 @@
             letter-spacing: -1px;
         }
 
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            align-items: flex-end;
+        }
+
+        .header-datetime {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+
         .header-actions {
             display: flex;
             gap: 12px;
@@ -589,6 +604,9 @@
         <!-- HEADER -->
         <header>
             <h1 class="header-title">Screen Time</h1>
+            <div class="header-info">
+                <div id="currentDateTime" class="header-datetime">—</div>
+            </div>
             <div class="header-actions">
                 <button class="theme-toggle" id="themeToggle" title="Toggle theme">
                     <span id="themeIcon">🌙</span>
@@ -603,8 +621,8 @@
                 <h2 class="card-title">Log Screen Time</h2>
                 <div class="input-form">
                     <div class="form-group">
-                        <label for="entryDate">Date</label>
-                        <input type="date" id="entryDate">
+                        <label for="entryDate">Date (dd/mm/yyyy)</label>
+                        <input type="text" id="entryDate" placeholder="28/02/2026" pattern="\d{2}/\d{2}/\d{4}">
                     </div>
 
                     <div class="form-group">
@@ -788,10 +806,56 @@
                 return hours * 60 + minutes;
             },
 
-            // Get today's date in YYYY-MM-DD format
-            getTodayDate() {
-                const today = new Date();
-                return today.toISOString().split('T')[0];
+            // Get yesterday's date in YYYY-MM-DD format (last completed day)
+            getYesterdayDate() {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                return yesterday.toISOString().split('T')[0];
+            },
+
+            // Convert YYYY-MM-DD to dd/mm/yyyy format
+            formatDateToDDMMYYYY(dateStr) {
+                if (!dateStr) return '';
+                const [year, month, day] = dateStr.split('-');
+                return `${day}/${month}/${year}`;
+            },
+
+            // Convert dd/mm/yyyy to YYYY-MM-DD format
+            formatDDMMYYYYToDate(dateStr) {
+                if (!dateStr || !dateStr.includes('/')) return '';
+                const parts = dateStr.split('/');
+                if (parts.length !== 3) return '';
+                const [day, month, year] = parts;
+                return `${year}-${month}-${day}`;
+            },
+
+            // Validate dd/mm/yyyy format
+            validateDateFormat(dateStr) {
+                const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+                if (!regex.test(dateStr)) return false;
+                
+                const [day, month, year] = dateStr.split('/');
+                const d = parseInt(day);
+                const m = parseInt(month);
+                const y = parseInt(year);
+
+                if (m < 1 || m > 12) return false;
+                if (d < 1 || d > 31) return false;
+
+                const date = new Date(y, m - 1, d);
+                return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+            },
+
+            // Get current real-time date and time
+            getCurrentDateTime() {
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = now.toLocaleString('en-US', { month: 'long' });
+                const year = now.getFullYear();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                return `${day} ${month} ${year} – ${hours}:${minutes}:${seconds}`;
             },
 
             // Get week number and day within week
@@ -896,7 +960,7 @@
                 const date = new Date(dateStr + 'T00:00:00');
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             },
-       
+
             // Get month name
             getMonthName(dateStr) {
                 const date = new Date(dateStr + 'T00:00:00');
@@ -1040,12 +1104,12 @@
             },
 
             updateTodayStats() {
-                const today = Utils.getTodayDate();
-                const entry = StorageManager.getEntry(today);
+                const yesterday = Utils.getYesterdayDate();
+                const entry = StorageManager.getEntry(yesterday);
 
                 if (entry) {
                     document.getElementById('todayValue').textContent = Utils.formatTime(Utils.toMinutes(entry.hours, entry.minutes));
-                    document.getElementById('todayDate').textContent = Utils.formatDate(today);
+                    document.getElementById('todayDate').textContent = Utils.formatDate(yesterday);
                 } else {
                     document.getElementById('todayValue').textContent = '0h 0m';
                     document.getElementById('todayDate').textContent = 'No data yet';
@@ -1119,18 +1183,18 @@
                 const goal = StorageManager.getGoal();
                 document.getElementById('goalDisplay').textContent = `${goal}h`;
                 
-                const today = Utils.getTodayDate();
-                const entry = StorageManager.getEntry(today);
-                const todayMinutes = entry ? Utils.toMinutes(entry.hours, entry.minutes) : 0;
+                const yesterday = Utils.getYesterdayDate();
+                const entry = StorageManager.getEntry(yesterday);
+                const yesterdayMinutes = entry ? Utils.toMinutes(entry.hours, entry.minutes) : 0;
                 const goalMinutes = goal * 60;
                 
-                if (todayMinutes === 0) {
+                if (yesterdayMinutes === 0) {
                     document.getElementById('goalStatus').textContent = `${goal}h / day`;
-                } else if (todayMinutes <= goalMinutes) {
-                    const remaining = goalMinutes - todayMinutes;
+                } else if (yesterdayMinutes <= goalMinutes) {
+                    const remaining = goalMinutes - yesterdayMinutes;
                     document.getElementById('goalStatus').textContent = `${Utils.formatTime(remaining)} remaining`;
                 } else {
-                    const over = todayMinutes - goalMinutes;
+                    const over = yesterdayMinutes - goalMinutes;
                     document.getElementById('goalStatus').textContent = `${Utils.formatTime(over)} over`;
                     document.getElementById('goalStatus').style.color = 'var(--accent-danger)';
                 }
@@ -1412,9 +1476,10 @@
         // EVENT HANDLERS
         // ========================================
         function initializeApp() {
-            // Set today's date as default
-            const today = Utils.getTodayDate();
-            document.getElementById('entryDate').value = today;
+            // Set yesterday's date as default (last completed day)
+            const yesterday = Utils.getYesterdayDate();
+            const yesterdayFormatted = Utils.formatDateToDDMMYYYY(yesterday);
+            document.getElementById('entryDate').value = yesterdayFormatted;
 
             // Load goal
             document.getElementById('dailyGoal').value = StorageManager.getGoal();
@@ -1425,9 +1490,18 @@
 
         // Submit entry
         document.getElementById('submitBtn').addEventListener('click', () => {
-            const date = document.getElementById('entryDate').value;
+            const dateFormatted = document.getElementById('entryDate').value;
             const hours = parseInt(document.getElementById('hours').value) || 0;
             const minutes = parseInt(document.getElementById('minutes').value) || 0;
+
+            // Validate date format
+            if (!Utils.validateDateFormat(dateFormatted)) {
+                Messages.showAlert('Invalid date format. Use dd/mm/yyyy (e.g., 28/02/2026)', 'warning');
+                return;
+            }
+
+            // Convert dd/mm/yyyy to YYYY-MM-DD for storage
+            const date = Utils.formatDDMMYYYYToDate(dateFormatted);
 
             if (hours === 0 && minutes === 0) {
                 Messages.showAlert('Please enter a valid time', 'warning');
@@ -1536,7 +1610,16 @@
 
         // Auto-update on date change
         document.getElementById('entryDate').addEventListener('change', (e) => {
-            const date = e.target.value;
+            const dateFormatted = e.target.value;
+            
+            // Validate and convert format
+            if (!Utils.validateDateFormat(dateFormatted)) {
+                document.getElementById('hours').value = '';
+                document.getElementById('minutes').value = '';
+                return;
+            }
+
+            const date = Utils.formatDDMMYYYYToDate(dateFormatted);
             const entry = StorageManager.getEntry(date);
             if (entry) {
                 document.getElementById('hours').value = entry.hours;
@@ -1547,9 +1630,20 @@
             }
         });
 
+        // Real-time date and time update
+        function updateDateTime() {
+            document.getElementById('currentDateTime').textContent = Utils.getCurrentDateTime();
+        }
+
         // Initialize app
         initializeTheme();
         initializeApp();
+        updateDateTime();
+
+        // Update date/time every second
+        setInterval(() => {
+            updateDateTime();
+        }, 1000);
 
         // Update UI every minute for real-time stats
         setInterval(() => {
